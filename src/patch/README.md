@@ -8,8 +8,8 @@
 - `applyPatch.js`
   - patch 적용 메인 엔진
   - patch 타입 정규화(`PROPS` -> `UPDATE_PROPS`)
-  - patch 정렬(깊은 path 우선, 형제는 큰 index 우선)
-  - 단일 patch 적용(`CREATE`, `REMOVE`, `REPLACE`, `TEXT`, `UPDATE_PROPS`)
+  - patch 정렬(깊은 path 우선 + 같은 부모 단계 우선순위 적용)
+  - 단일 patch 적용(`CREATE`, `REMOVE`, `MOVE`, `REPLACE`, `TEXT`, `UPDATE_PROPS`)
 - `domOps.js`
   - path 탐색 보조 유틸
   - path 인덱싱 대상 child 목록 추출
@@ -21,6 +21,7 @@
 
 - `CREATE`
 - `REMOVE`
+- `MOVE`
 - `REPLACE`
 - `TEXT`
 - `UPDATE_PROPS`
@@ -33,6 +34,7 @@ payload 형태:
 
 - `CREATE` / `REPLACE`: `node`
 - `TEXT`: `text`
+- `MOVE`: `to` (목표 인덱스), 선택적으로 `key`
 - `UPDATE_PROPS`: `props`
   - `props.set`: 적용/덮어쓰기할 속성
   - `props.remove`: 삭제할 속성 키 배열
@@ -54,13 +56,18 @@ payload 형태:
 정렬 규칙:
 
 1. path depth가 깊은 patch 먼저
-2. 같은 부모 아래 형제 patch는 index가 큰 patch 먼저
-3. 나머지는 path 역순 비교로 결정적 순서 유지
+2. 같은 부모에서는 단계 우선순위 적용
+   - `REMOVE` -> `CREATE` -> `MOVE` -> `REPLACE` -> `TEXT` -> `UPDATE_PROPS`
+3. 같은 단계 내부는 타입별 정렬 적용
+   - `REMOVE`: index 큰 것부터
+   - `CREATE`: index 작은 것부터
+   - `MOVE`: `to` 작은 것부터
+4. 나머지는 path 역순 비교로 결정적 순서 유지
 
 이유:
 
-- `REMOVE`/`REPLACE`가 섞일 때 앞 index를 먼저 건드리면 뒤 index 대상이 밀릴 수 있습니다.
-- 깊은 노드부터, 그리고 형제는 큰 index부터 처리해야 이런 부작용을 줄일 수 있습니다.
+- 구조 변경과 내용 갱신 patch를 섞어 적용하면 path 기준이 흔들릴 수 있습니다.
+- 단계 우선순위와 타입별 정렬을 분리하면 인덱스 밀림과 잘못된 대상 적용을 줄일 수 있습니다.
 
 ## 타입별 동작
 
@@ -70,12 +77,15 @@ payload 형태:
 - `TEXT`: 루트가 text 노드일 때만 반영
 - `UPDATE_PROPS`: 루트 element 속성만 부분 반영
 - `REMOVE`: 빈 text 노드로 대체해 참조 흐름 유지
+- `MOVE`: 루트에는 적용하지 않음(자식 이동 전용)
 
 비루트 patch 처리:
 
 - `parentPath`로 부모를 찾고, `targetIndex`로 대상 자식 접근
 - `CREATE`: `insertBefore(anchor)` 방식으로 index 위치 삽입
 - `REMOVE`: 대상이 있을 때만 제거
+- `MOVE`: 기존 위치(path)에서 목표 위치(`to`)로 같은 노드를 재배치
+  - `key`가 있으면 key로 현재 노드를 다시 찾아 이동
 - `REPLACE`: 대상이 있을 때만 교체
 - `TEXT`: 대상이 text 노드일 때만 텍스트 교체
 - `UPDATE_PROPS`: 대상 element 속성 부분 갱신
@@ -96,13 +106,14 @@ payload 형태:
 
 ## 현재 한계
 
-- `MOVE` 타입을 지원하지 않습니다.
-- keyed reorder는 diff 쪽에서 1차 정리되어도, patch는 index 기반 적용이 기본입니다.
-- 따라서 "순서 재배치만 있는 케이스"는 별도 정책/확장이 필요합니다.
+- `MOVE`는 "같은 부모 내 자식 재배치"를 기준으로 지원합니다.
+- 부모 변경(다른 부모로 이동) 시나리오는 아직 별도 규칙이 없습니다.
+- `key`가 없는 이동은 path 인덱스 fallback으로 처리하므로 복잡한 reorder에서는 안정성이 낮을 수 있습니다.
 
 ## 디버깅 체크리스트
 
 - patch path가 `domOps` 인덱싱 기준(element + 의미 있는 text)과 일치하는지 확인
-- 같은 부모 형제 patch 순서가 큰 index 우선으로 적용되는지 확인
+- 같은 부모 형제 patch가 단계 우선순위(REMOVE -> CREATE -> MOVE -> 내용 갱신)대로 적용되는지 확인
+- `MOVE` patch의 `to`와 선택 `key`가 올바른지 확인
 - `UPDATE_PROPS` payload가 `{ set, remove }` 형태인지 확인
 - 루트 교체 케이스에서 반환 루트를 호출부가 교체 처리하는지 확인
