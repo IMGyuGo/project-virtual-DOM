@@ -3,7 +3,7 @@ function createRoomCard(state) {
   const room = document.createElement('article');
   room.className = 'room-card';
   room.setAttribute('data-room', state.room);
-  room.setAttribute('data-key', state.room);
+  room.setAttribute('data-key', state.id);
   room.setAttribute('data-theme', 'light');
 
   room.innerHTML = `
@@ -12,7 +12,12 @@ function createRoomCard(state) {
       <button type="button" class="card-theme-btn" data-action="toggle-card-theme">다크모드</button>
     </div>
     <ul class="device-list">
-      <li class="device-row" data-device="light" data-active="${state.lightOn ? 'on' : 'off'}">
+      <li
+        class="device-row"
+        data-device="light"
+        data-key="${state.deviceIds.light}"
+        data-active="${state.lightOn ? 'on' : 'off'}"
+      >
         <span class="device-name">조명</span>
         <div class="state-buttons" role="group" aria-label="${state.title} 조명">
           <button type="button" class="chip-btn" data-action="set-light" data-value="on">ON</button>
@@ -21,7 +26,12 @@ function createRoomCard(state) {
         <strong class="device-readout">${state.lightOn ? 'ON' : 'OFF'}</strong>
       </li>
 
-      <li class="device-row device-row-ac" data-device="ac" data-power="${state.acOn ? 'on' : 'off'}">
+      <li
+        class="device-row device-row-ac"
+        data-device="ac"
+        data-key="${state.deviceIds.ac}"
+        data-power="${state.acOn ? 'on' : 'off'}"
+      >
         <span class="device-name">에어컨</span>
         <label class="temp-control">
           온도
@@ -42,7 +52,12 @@ function createRoomCard(state) {
         </div>
       </li>
 
-      <li class="device-row" data-device="camera" data-state="${state.cameraState}">
+      <li
+        class="device-row"
+        data-device="camera"
+        data-key="${state.deviceIds.camera}"
+        data-state="${state.cameraState}"
+      >
         <span class="device-name">보안카메라</span>
         <div class="state-buttons" role="group" aria-label="${state.title} 카메라">
           <button type="button" class="chip-btn" data-action="set-camera" data-value="recording">녹화중</button>
@@ -282,18 +297,43 @@ export function createNexusBoard() {
 
   const grid = board.querySelector('.room-grid');
   grid.append(
-    createRoomCard({ room: 'living', title: '거실', lightOn: true, acOn: true, acTemp: 24, cameraState: 'recording' }),
     createRoomCard({
+      id: 'room-living',
+      room: 'living',
+      title: '거실',
+      deviceIds: {
+        light: 'device-living-light',
+        ac: 'device-living-ac',
+        camera: 'device-living-camera',
+      },
+      lightOn: true,
+      acOn: true,
+      acTemp: 24,
+      cameraState: 'recording',
+    }),
+    createRoomCard({
+      id: 'room-bedroom',
       room: 'bedroom',
       title: '침실',
+      deviceIds: {
+        light: 'device-bedroom-light',
+        ac: 'device-bedroom-ac',
+        camera: 'device-bedroom-camera',
+      },
       lightOn: true,
       acOn: true,
       acTemp: 24,
       cameraState: 'idle',
     }),
     createRoomCard({
+      id: 'room-kitchen',
       room: 'kitchen',
       title: '주방',
+      deviceIds: {
+        light: 'device-kitchen-light',
+        ac: 'device-kitchen-ac',
+        camera: 'device-kitchen-camera',
+      },
       lightOn: true,
       acOn: false,
       acTemp: 22,
