@@ -37,6 +37,10 @@ function warnDuplicateKey(key, index, sourceLabel) {
   console.warn(`[diff/keyedDiff] 중복 key 감지: "${key}" (${sourceLabel}, index: ${index})`);
 }
 
+function warnMissingKey(index, sourceLabel) {
+  console.warn(`[diff/keyedDiff] key 누락 감지: (${sourceLabel}, index: ${index})`);
+}
+
 // 자식 배열 안에서 key가 중복되는지 미리 확인한다.
 // old/new 어느 쪽에서든 고유 key 규칙이 깨지면 MOVE/CREATE/REMOVE 판단이 흔들릴 수 있으므로, pair 생성 전에 경고를 남긴다.
 function validateUniqueKeys(children = [], sourceLabel) {
@@ -52,6 +56,17 @@ function validateUniqueKeys(children = [], sourceLabel) {
     }
 
     seenKeys.add(key);
+  });
+}
+
+function validateKeyCompleteness(children = [], sourceLabel) {
+  if (!hasAnyKey(children)) return;
+
+  children.forEach((child, index) => {
+    if (!child || child.type !== 'element') return;
+    if (getNodeKey(child) != null) return;
+
+    warnMissingKey(index, sourceLabel);
   });
 }
 
@@ -81,6 +96,8 @@ export function buildKeyMap(children = []) {
 export function collectKeyedPairs(oldChildren = [], newChildren = []) {
   validateUniqueKeys(oldChildren, 'oldChildren');
   validateUniqueKeys(newChildren, 'newChildren');
+  validateKeyCompleteness(oldChildren, 'oldChildren');
+  validateKeyCompleteness(newChildren, 'newChildren');
 
   const oldKeyMap = buildKeyMap(oldChildren);
   const matchedKeys = new Set();
