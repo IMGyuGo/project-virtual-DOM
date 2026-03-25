@@ -196,7 +196,9 @@ export function createNexusBoard() {
   return board;
 }
 
-export function bindNexusEditor(testRoot, onStatus) {
+export function bindNexusEditor(testRoot, handlers = {}) {
+  const { onStatus, onChange } = handlers;
+
   testRoot.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' && event.target.tagName !== 'BUTTON') {
       event.preventDefault();
@@ -220,18 +222,21 @@ export function bindNexusEditor(testRoot, onStatus) {
       row.setAttribute('data-active', value === 'on' ? 'on' : 'off');
       syncRoomPresentation(row.closest('.room-card'));
       onStatus?.('조명 상태를 수정했습니다. Patch를 누르면 실제 영역에 반영됩니다.');
+      onChange?.();
     }
 
     if (action === 'set-ac-power') {
       row.setAttribute('data-power', value === 'on' ? 'on' : 'off');
       syncRoomPresentation(row.closest('.room-card'));
       onStatus?.('에어컨 동작 상태를 수정했습니다. Patch를 눌러 반영하세요.');
+      onChange?.();
     }
 
     if (action === 'set-camera') {
       row.setAttribute('data-state', value === 'recording' ? 'recording' : 'idle');
       syncRoomPresentation(row.closest('.room-card'));
       onStatus?.('카메라 상태를 수정했습니다. Patch를 눌러 반영하세요.');
+      onChange?.();
     }
   });
 
@@ -258,6 +263,7 @@ export function bindNexusEditor(testRoot, onStatus) {
     }
 
     onStatus?.('에어컨 온도를 수정했습니다. Patch를 눌러 반영하세요.');
+    onChange?.();
   });
 }
 

@@ -35,11 +35,12 @@ export function createLayout(root) {
       <section class="trees tree-grid">
         <article class="panel-card">
           <h3>Real-time Patch Log</h3>
-          <p>가장 최근 diff 결과를 이벤트 로그로 표시합니다.</p>
+          <p class="tree-caption">가장 최근 diff 결과를 이벤트 로그로 표시합니다. 페이지를 수정하면 자동으로 갱신됩니다.</p>
           <div id="patch-log" class="patch-log"></div>
         </article>
         <article class="panel-card">
           <h3>Diff 결과 (달라진 내용)</h3>
+          <p class="tree-caption">가장 최근 diff 결과를 구조화된 트리로 보여줍니다. 페이지를 수정하면 자동으로 갱신됩니다.</p>
           <pre id="json-diff" class="json-box"></pre>
         </article>
         <article class="panel-card">

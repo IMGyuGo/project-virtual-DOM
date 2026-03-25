@@ -32,21 +32,32 @@ function bootstrap() {
   const store = createStore(initialTree);
   const history = new History(initialTree);
 
+  const getDraftDiff = () => {
+    const latestTestNode = ui.testRoot.firstElementChild;
+    if (!latestTestNode) return null;
+
+    const nextTree = domToVdom(latestTestNode);
+    const patches = diff(store.getTree(), nextTree);
+    return { nextTree, patches };
+  };
+
+  const renderDraftDiff = () => {
+    const draft = getDraftDiff();
+    renderJson(ui.patchViewer, draft ? draft.patches : []);
+  };
+
   renderJson(ui.currentTreeViewer, store.getTree());
   renderJson(ui.patchViewer, []);
   syncControlState(ui, history);
 
   const onPatch = () => {
-    const prevTree = store.getTree();
-    const latestTestNode = ui.testRoot.firstElementChild;
-
-    if (!latestTestNode) {
+    const draft = getDraftDiff();
+    if (!draft) {
       setStatus(ui, '테스트 영역이 비어 있어 Patch를 중단했습니다.');
       return;
     }
 
-    const nextTree = domToVdom(latestTestNode);
-    const patches = diff(prevTree, nextTree);
+    const { nextTree, patches } = draft;
     const currentActualNode = ui.actualRoot.firstElementChild;
 
     if (currentActualNode) {
@@ -76,7 +87,7 @@ function bootstrap() {
     store.setTree(tree);
     renderBothFromTree(ui, tree);
     renderJson(ui.currentTreeViewer, tree);
-    renderJson(ui.patchViewer, [{ type: actionText, note: 'history restore' }]);
+    renderDraftDiff();
     syncControlState(ui, history);
     setStatus(ui, `${actionText} 완료`);
   };
@@ -91,7 +102,7 @@ function bootstrap() {
     syncFromHistory(tree, '앞으로가기');
   };
 
-  bindControls(ui, { onPatch, onUndo, onRedo });
+  bindControls(ui, { onPatch, onUndo, onRedo, onDraftChange: renderDraftDiff });
   setStatus(ui, '초기화 완료');
 }
 

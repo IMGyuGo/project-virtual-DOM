@@ -26,6 +26,7 @@ function seedNexusDemo(ui, handlers) {
   ui.testRoot.replaceChildren(createNexusBoard());
   handlers.onPatch();
   reconcileIfNeeded(ui);
+  handlers.onDraftChange?.();
   setHint(ui.status, 'Nexus Home 초기화 완료: 장치 상태를 수정한 뒤 Patch를 눌러 비교하세요.');
 }
 
@@ -46,18 +47,23 @@ export function bindControls(ui, handlers) {
     const awayOn = toggleAwayMode(testRoot);
     if (awayOn === true) setHint(status, '외출모드 ON으로 변경했습니다. Patch를 눌러 반영하세요.');
     if (awayOn === false) setHint(status, '외출모드 OFF로 변경했습니다. Patch를 눌러 반영하세요.');
+    handlers.onDraftChange?.();
   });
 
   hourPlusBtn.addEventListener('click', () => {
     const changed = addOneHour(testRoot);
     if (changed) setHint(status, '시간을 1시간 진행했습니다. Patch를 눌러 반영하세요.');
+    handlers.onDraftChange?.();
   });
 
   resetBtn.addEventListener('click', () => {
     seedNexusDemo(ui, handlers);
   });
 
-  bindNexusEditor(testRoot, (message) => setHint(status, message));
+  bindNexusEditor(testRoot, {
+    onStatus: (message) => setHint(status, message),
+    onChange: () => handlers.onDraftChange?.(),
+  });
 
   setTimeout(() => {
     seedNexusDemo(ui, handlers);

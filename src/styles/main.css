@@ -11,6 +11,7 @@
   --accent-strong: #005e55;
   --warn: #c53c27;
   --shadow: 0 18px 40px rgba(16, 22, 33, 0.12);
+  --diff-panel-height: 340px;
 }
 
 * {
@@ -136,6 +137,10 @@ button:disabled {
   font-size: 13px;
 }
 
+.tree-caption {
+  min-height: 38px;
+}
+
 .panel {
   min-height: 420px;
   border-radius: 12px;
@@ -154,8 +159,8 @@ button:disabled {
 }
 
 .patch-log {
-  min-height: 420px;
-  max-height: 420px;
+  min-height: var(--diff-panel-height);
+  max-height: var(--diff-panel-height);
   overflow: auto;
   border-radius: 12px;
   border: 1px solid #243045;
@@ -191,6 +196,11 @@ button:disabled {
   background: #0f1725;
   color: #d6e0f5;
   padding: 10px;
+}
+
+#json-diff {
+  min-height: var(--diff-panel-height);
+  max-height: var(--diff-panel-height);
 }
 
 #json-current,
@@ -560,5 +570,11 @@ button:disabled {
   .header-meta,
   .room-grid {
     grid-template-columns: 1fr;
+  }
+
+  .patch-log,
+  #json-diff {
+    min-height: 280px;
+    max-height: 280px;
   }
 }
