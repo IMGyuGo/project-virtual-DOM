@@ -7,7 +7,7 @@ import { createStore } from './state/store.js';
 import { createSampleBoardNode } from './samples/fridgeSample.js';
 import { createLayout } from './ui/layout.js';
 import { bindControls, syncControlState } from './ui/controls.js';
-import { renderJson } from './ui/jsonTreeViewer.js';
+import { renderJson, renderTreePreview } from './ui/jsonTreeViewer.js';
 import { patchSummary } from './utils/logger.js';
 
 function setStatus(ui, message) {
@@ -43,6 +43,7 @@ function bootstrap() {
 
   const renderDraftDiff = () => {
     const draft = getDraftDiff();
+    renderTreePreview(draft ? draft.nextTree : store.getTree());
     renderJson(ui.patchViewer, draft ? draft.patches : []);
   };
 
@@ -59,7 +60,7 @@ function bootstrap() {
 
     const { nextTree, patches } = draft;
     if (patches.length === 0) {
-      renderJson(ui.patchViewer, []);
+      renderDraftDiff();
       syncControlState(ui, history);
       setStatus(ui, '변경 사항이 없어 Patch를 생략했습니다.');
       return;
@@ -79,7 +80,7 @@ function bootstrap() {
     store.setTree(nextTree);
 
     renderJson(ui.currentTreeViewer, nextTree);
-    renderJson(ui.patchViewer, patches);
+    renderDraftDiff();
     syncControlState(ui, history);
     setStatus(ui, `Patch 적용 완료 (${patchSummary(patches)})`);
   };

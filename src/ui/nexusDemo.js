@@ -1,14 +1,10 @@
-function twoDigits(value) {
-  return String(value).padStart(2, '0');
-}
-
 function createRoomCard(state) {
   const room = document.createElement('article');
   room.className = 'room-card';
   room.setAttribute('data-room', state.room);
 
   room.innerHTML = `
-    <h5 class="room-title">${state.title}</h5>
+    <h5 class="room-title" draggable="true" data-drag-handle="true">${state.title}</h5>
     <ul class="device-list">
       <li class="device-row" data-device="light" data-active="${state.lightOn ? 'on' : 'off'}">
         <span class="device-name">조명</span>
@@ -55,26 +51,118 @@ function createRoomCard(state) {
   return room;
 }
 
-function createSecurityLogItems() {
-  return [
-    { id: 'sec-03', text: '13:58 Front door lock checked' },
-    { id: 'sec-02', text: '13:46 Kitchen motion detected' },
-    { id: 'sec-01', text: '13:40 Living light toggled' },
-  ];
-}
-
 function getBoard(testRoot) {
   return testRoot.firstElementChild;
 }
 
-function getClockParts(board) {
-  const clockEl = board.querySelector('[data-field="clock"]');
-  if (!clockEl || !clockEl.textContent) return { hour: 14, minute: 0 };
-  const [hourRaw, minuteRaw] = clockEl.textContent.split(':');
-  return {
-    hour: Number.parseInt(hourRaw, 10) || 14,
-    minute: Number.parseInt(minuteRaw, 10) || 0,
+function getRoomGrid(testRoot) {
+  return getBoard(testRoot)?.querySelector('.room-grid') ?? null;
+}
+
+function roomOrder(grid) {
+  return Array.from(grid.querySelectorAll('.room-card[data-room]')).map((card) => card.getAttribute('data-room') ?? '');
+}
+
+function bindRoomDnD(testRoot, handlers = {}) {
+  const { onStatus, onChange } = handlers;
+  let draggingCard = null;
+  let dropSlot = null;
+  let startOrder = '';
+
+  const clearDnD = (grid) => {
+    if (dropSlot) {
+      dropSlot.remove();
+      dropSlot = null;
+    }
+    if (draggingCard) {
+      draggingCard.classList.remove('is-dragging', 'is-drag-hidden');
+      draggingCard = null;
+    }
+    if (grid) {
+      grid.classList.remove('is-sorting');
+    }
   };
+
+  const finalizeDrop = () => {
+    if (!draggingCard) return;
+    const grid = getRoomGrid(testRoot);
+    const beforeOrder = startOrder;
+
+    if (grid && dropSlot && dropSlot.parentElement === grid) {
+      grid.insertBefore(draggingCard, dropSlot);
+    }
+
+    const endOrder = grid ? roomOrder(grid).join('|') : beforeOrder;
+    clearDnD(grid);
+
+    if (beforeOrder !== endOrder) {
+      onStatus?.('카드 순서를 변경했습니다. Patch를 눌러 반영하세요.');
+      onChange?.();
+    }
+  };
+
+  testRoot.addEventListener('dragstart', (event) => {
+    const handle = event.target.closest('[data-drag-handle="true"]');
+    if (!handle) return;
+
+    const card = handle.closest('.room-card');
+    const grid = getRoomGrid(testRoot);
+    if (!card || !grid) return;
+
+    draggingCard = card;
+    startOrder = roomOrder(grid).join('|');
+    dropSlot = document.createElement('article');
+    dropSlot.className = 'room-card room-drop-slot';
+    dropSlot.setAttribute('aria-hidden', 'true');
+    dropSlot.style.height = `${card.getBoundingClientRect().height}px`;
+    grid.insertBefore(dropSlot, card.nextElementSibling);
+
+    draggingCard.classList.add('is-dragging');
+    grid.classList.add('is-sorting');
+    setTimeout(() => {
+      draggingCard?.classList.add('is-drag-hidden');
+    }, 0);
+
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', card.getAttribute('data-room') ?? '');
+    }
+  });
+
+  testRoot.addEventListener('dragover', (event) => {
+    if (!draggingCard) return;
+    const grid = getRoomGrid(testRoot);
+    if (!grid || !dropSlot) return;
+
+    event.preventDefault();
+    const hovered = event.target.closest('.room-card');
+
+    if (!hovered || hovered === draggingCard) {
+      if (grid.lastElementChild !== dropSlot) {
+        grid.appendChild(dropSlot);
+      }
+      return;
+    }
+
+    if (hovered === dropSlot) return;
+
+    const rect = hovered.getBoundingClientRect();
+    const insertBefore = event.clientY < rect.top + rect.height / 2;
+    const anchor = insertBefore ? hovered : hovered.nextElementSibling;
+    if (anchor !== dropSlot) {
+      grid.insertBefore(dropSlot, anchor);
+    }
+  });
+
+  testRoot.addEventListener('drop', (event) => {
+    if (!draggingCard) return;
+    event.preventDefault();
+    finalizeDrop();
+  });
+
+  testRoot.addEventListener('dragend', () => {
+    finalizeDrop();
+  });
 }
 
 function setButtonState(container, action, activeValue) {
@@ -108,7 +196,7 @@ function syncRoomPresentation(room) {
       const safeTemp = Math.max(16, Math.min(30, temp));
       input.value = String(safeTemp);
       input.setAttribute('value', String(safeTemp));
-      readout.textContent = `${safeTemp}C`;
+      readout.textContent = power === 'on' ? `${safeTemp}C` : 'OFF';
     }
   }
 
@@ -151,10 +239,6 @@ export function createNexusBoard() {
   board.className = 'nexus-board';
   board.setAttribute('data-mode', 'home');
 
-  const logs = createSecurityLogItems()
-    .map((log) => `<li data-key="${log.id}">${log.text}</li>`)
-    .join('');
-
   board.innerHTML = `
     <header class="nexus-header">
       <h4>Nexus Home</h4>
@@ -165,10 +249,6 @@ export function createNexusBoard() {
       </div>
     </header>
     <div class="room-grid"></div>
-    <section class="security-panel">
-      <h5>Recent Security Logs</h5>
-      <ol class="security-list">${logs}</ol>
-    </section>
   `;
 
   const grid = board.querySelector('.room-grid');
@@ -198,6 +278,8 @@ export function createNexusBoard() {
 
 export function bindNexusEditor(testRoot, handlers = {}) {
   const { onStatus, onChange } = handlers;
+
+  bindRoomDnD(testRoot, handlers);
 
   testRoot.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' && event.target.tagName !== 'BUTTON') {
@@ -256,7 +338,8 @@ export function bindNexusEditor(testRoot, handlers = {}) {
 
     const readout = row.querySelector('.ac-temp-readout');
     if (readout) {
-      readout.textContent = `${safe}C`;
+      const isPowerOn = row.getAttribute('data-power') === 'on';
+      readout.textContent = isPowerOn ? `${safe}C` : 'OFF';
       readout.classList.remove('temp-hit');
       void readout.offsetWidth;
       readout.classList.add('temp-hit');
@@ -274,25 +357,4 @@ export function toggleAwayMode(testRoot) {
   const turnOn = board.getAttribute('data-mode') !== 'away';
   applyAway(board, turnOn);
   return turnOn;
-}
-
-export function addOneHour(testRoot) {
-  const board = getBoard(testRoot);
-  if (!board) return false;
-
-  const clockEl = board.querySelector('[data-field="clock"]');
-  const weatherEl = board.querySelector('[data-field="weather"]');
-  const energyEl = board.querySelector('[data-field="energy"]');
-  if (!clockEl || !weatherEl || !energyEl) return false;
-
-  const { hour, minute } = getClockParts(board);
-  const nextHour = (hour + 1) % 24;
-  clockEl.textContent = `${twoDigits(nextHour)}:${twoDigits(minute)}`;
-
-  weatherEl.textContent = nextHour >= 18 || nextHour < 6 ? 'Cloudy 18C' : 'Sunny 21C';
-  const currentEnergy = Number.parseFloat(energyEl.textContent) || 4.2;
-  const nextEnergy = Math.max(2.4, Math.min(6.8, currentEnergy + (nextHour % 2 === 0 ? 0.2 : -0.1)));
-  energyEl.textContent = `${nextEnergy.toFixed(1)}kWh`;
-
-  return true;
 }

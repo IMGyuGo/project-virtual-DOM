@@ -1,5 +1,4 @@
 import {
-  addOneHour,
   bindNexusEditor,
   createNexusBoard,
   toggleAwayMode,
@@ -31,7 +30,7 @@ function seedNexusDemo(ui, handlers) {
 }
 
 export function bindControls(ui, handlers) {
-  const { patchBtn, undoBtn, redoBtn, awayToggleBtn, hourPlusBtn, resetBtn, status, testRoot } = ui;
+  const { patchBtn, undoBtn, redoBtn, awayToggleBtn, resetBtn, status, testRoot } = ui;
 
   patchBtn.addEventListener('click', () => {
     handlers.onPatch();
@@ -47,12 +46,6 @@ export function bindControls(ui, handlers) {
     const awayOn = toggleAwayMode(testRoot);
     if (awayOn === true) setHint(status, '외출모드 ON으로 변경했습니다. Patch를 눌러 반영하세요.');
     if (awayOn === false) setHint(status, '외출모드 OFF로 변경했습니다. Patch를 눌러 반영하세요.');
-    handlers.onDraftChange?.();
-  });
-
-  hourPlusBtn.addEventListener('click', () => {
-    const changed = addOneHour(testRoot);
-    if (changed) setHint(status, '시간을 1시간 진행했습니다. Patch를 눌러 반영하세요.');
     handlers.onDraftChange?.();
   });
 

@@ -14,7 +14,6 @@ export function createLayout(root) {
         <button id="btn-undo" type="button">뒤로가기</button>
         <button id="btn-redo" type="button">앞으로가기</button>
         <button id="btn-away-toggle" type="button">외출모드 ON OFF</button>
-        <button id="btn-hour-plus" type="button">시간+1시간</button>
         <button id="btn-reset" type="button">초기화</button>
         <span id="status" class="status">준비됨</span>
       </section>
@@ -66,7 +65,6 @@ export function createLayout(root) {
     undoBtn: root.querySelector('#btn-undo'),
     redoBtn: root.querySelector('#btn-redo'),
     awayToggleBtn: root.querySelector('#btn-away-toggle'),
-    hourPlusBtn: root.querySelector('#btn-hour-plus'),
     resetBtn: root.querySelector('#btn-reset'),
     status: root.querySelector('#status'),
     actualRoot: root.querySelector('#actual-root'),

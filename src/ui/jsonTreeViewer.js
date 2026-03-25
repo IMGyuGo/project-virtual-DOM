@@ -167,37 +167,60 @@ function renderPatchLog(patches) {
   log.replaceChildren(...rows);
 }
 
-function vnodeLabel(node) {
-  if (!node) return 'null';
-  if (node.type === 'text') {
-    const text = String(node.text ?? '').slice(0, 16);
-    return `"${text}"`;
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function alphaLabel(index) {
+  let value = index + 1;
+  let text = '';
+  while (value > 0) {
+    const rest = (value - 1) % 26;
+    text = String.fromCharCode(65 + rest) + text;
+    value = Math.floor((value - 1) / 26);
   }
+  return text;
+}
+
+function nodeSummary(node) {
+  if (!node) return 'null';
+  if (node.type === 'text') return 'text';
   return `<${node.tag}>`;
 }
 
-function buildVdomGraph(node, path = []) {
-  const li = document.createElement('li');
-  li.className = 'graph-item';
+function createSvgEl(tag, attrs = {}) {
+  const el = document.createElementNS(SVG_NS, tag);
+  for (const [name, value] of Object.entries(attrs)) {
+    el.setAttribute(name, String(value));
+  }
+  return el;
+}
 
-  const marker = document.createElement('span');
-  marker.className = 'graph-node';
-  marker.setAttribute('data-path', path.join('.'));
-  marker.textContent = vnodeLabel(node);
-  li.appendChild(marker);
+function collectGraphRecords(node, path = [], depth = 0, records = []) {
+  if (!node) return null;
+  const id = records.length;
+  const record = { id, node, path, depth, children: [], x: 0 };
+  records.push(record);
 
-  if (node && node.type === 'element' && Array.isArray(node.children) && node.children.length > 0) {
-    const children = document.createElement('ul');
-    children.className = 'graph-branch';
-
+  if (node.type === 'element' && Array.isArray(node.children) && node.children.length > 0) {
     node.children.forEach((child, index) => {
-      children.appendChild(buildVdomGraph(child, [...path, index]));
+      const childId = collectGraphRecords(child, [...path, index], depth + 1, records);
+      if (childId !== null) record.children.push(childId);
     });
-
-    li.appendChild(children);
   }
 
-  return li;
+  return id;
+}
+
+function assignHorizontalPositions(records, id, layoutState) {
+  const record = records[id];
+  if (record.children.length === 0) {
+    record.x = layoutState.nextX;
+    layoutState.nextX += 1;
+    return record.x;
+  }
+
+  const xs = record.children.map((childId) => assignHorizontalPositions(records, childId, layoutState));
+  record.x = xs.reduce((sum, current) => sum + current, 0) / xs.length;
+  return record.x;
 }
 
 function renderTreeGraph(vdomTree) {
@@ -209,13 +232,119 @@ function renderTreeGraph(vdomTree) {
     return;
   }
 
+  const records = [];
+  const rootId = collectGraphRecords(vdomTree, [], 0, records);
+  if (rootId === null) {
+    graph.textContent = '트리 데이터 없음';
+    return;
+  }
+
+  const layoutState = { nextX: 0 };
+  assignHorizontalPositions(records, rootId, layoutState);
+
+  const maxDepth = records.reduce((max, record) => Math.max(max, record.depth), 0);
+  const leafCount = Math.max(1, layoutState.nextX);
+  const leftPad = 38;
+  const topPad = 28;
+  const xGap = 72;
+  const yGap = 76;
+  const rightPad = 170;
+  const bottomPad = 34;
+  const nodeRadius = 16;
+  const maxNodeX = leftPad + (leafCount - 1) * xGap;
+  const levelLabelX = maxNodeX + 78;
+  const width = maxNodeX + rightPad;
+  const height = topPad + maxDepth * yGap + bottomPad;
+
+  const points = new Map();
+  records.forEach((record) => {
+    points.set(record.id, {
+      x: leftPad + record.x * xGap,
+      y: topPad + record.depth * yGap,
+    });
+  });
+
   const wrapper = document.createElement('div');
-  wrapper.className = 'graph-tree';
-  const ul = document.createElement('ul');
-  ul.className = 'graph-branch';
-  ul.appendChild(buildVdomGraph(vdomTree, []));
-  wrapper.appendChild(ul);
+  wrapper.className = 'graph-readable';
+  const svg = createSvgEl('svg', {
+    class: 'graph-svg',
+    viewBox: `0 0 ${width} ${height}`,
+    role: 'img',
+    'aria-label': 'Virtual DOM tree visualizer',
+  });
+
+  for (let level = 0; level <= maxDepth; level += 1) {
+    const y = topPad + level * yGap;
+    const guide = createSvgEl('line', {
+      class: 'graph-level-guide',
+      x1: leftPad - nodeRadius,
+      y1: y,
+      x2: maxNodeX + 28,
+      y2: y,
+    });
+    svg.appendChild(guide);
+
+    const label = createSvgEl('text', {
+      class: 'graph-level-label',
+      x: levelLabelX,
+      y: y + 4,
+    });
+    label.textContent = `레벨 ${level}`;
+    svg.appendChild(label);
+  }
+
+  records.forEach((record) => {
+    const from = points.get(record.id);
+    record.children.forEach((childId) => {
+      const to = points.get(childId);
+      const line = createSvgEl('line', {
+        class: 'graph-edge',
+        x1: from.x,
+        y1: from.y,
+        x2: to.x,
+        y2: to.y,
+      });
+      svg.appendChild(line);
+    });
+  });
+
+  records.forEach((record) => {
+    const point = points.get(record.id);
+    const group = createSvgEl('g', {
+      class: 'graph-point',
+      transform: `translate(${point.x}, ${point.y})`,
+    });
+
+    const marker = createSvgEl('circle', {
+      class: 'graph-node',
+      cx: 0,
+      cy: 0,
+      r: nodeRadius,
+      'data-path': record.path.join('.'),
+    });
+    group.appendChild(marker);
+
+    const label = createSvgEl('text', {
+      class: 'graph-node-label',
+      x: 0,
+      y: 1,
+    });
+    label.textContent = alphaLabel(record.id);
+    group.appendChild(label);
+
+    const tooltip = createSvgEl('title');
+    tooltip.textContent = `${alphaLabel(record.id)} ${nodeSummary(record.node)} @ ${pathText(record.path)}`;
+    group.appendChild(tooltip);
+
+    svg.appendChild(group);
+  });
+
+  wrapper.appendChild(svg);
   graph.replaceChildren(wrapper);
+}
+
+export function renderTreePreview(vdomTree) {
+  renderTreeGraph(vdomTree);
 }
 
 export function renderJson(el, value) {
@@ -228,7 +357,7 @@ export function renderJson(el, value) {
 
     renderPrettyTree(el, before);
     renderPrettyTree(document.querySelector('#json-after'), after);
-    renderTreeGraph(after);
+    renderTreePreview(after);
     return;
   }
 
