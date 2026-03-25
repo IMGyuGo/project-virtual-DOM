@@ -1,4 +1,6 @@
 export function createLayout(root) {
+  // 실제 HTML 마크업을 JS로 한 번에 그려 넣는다.
+  // index.html에는 #app만 있고, 화면 구조는 여기서 만들어진다.
   root.innerHTML = `
     <main class="nexus-shell">
       <header class="hero">
@@ -14,7 +16,6 @@ export function createLayout(root) {
         <button id="btn-undo" type="button">뒤로가기</button>
         <button id="btn-redo" type="button">앞으로가기</button>
         <button id="btn-away-toggle" type="button">외출모드 ON OFF</button>
-        <button id="btn-hour-plus" type="button">시간+1시간</button>
         <button id="btn-reset" type="button">초기화</button>
         <span id="status" class="status">준비됨</span>
       </section>
@@ -35,11 +36,12 @@ export function createLayout(root) {
       <section class="trees tree-grid">
         <article class="panel-card">
           <h3>Real-time Patch Log</h3>
-          <p>가장 최근 diff 결과를 이벤트 로그로 표시합니다.</p>
+          <p class="tree-caption">가장 최근 diff 결과를 이벤트 로그로 표시합니다. 페이지를 수정하면 자동으로 갱신됩니다.</p>
           <div id="patch-log" class="patch-log"></div>
         </article>
         <article class="panel-card">
           <h3>Diff 결과 (달라진 내용)</h3>
+          <p class="tree-caption">가장 최근 diff 결과를 구조화된 트리로 보여줍니다. 페이지를 수정하면 자동으로 갱신됩니다.</p>
           <pre id="json-diff" class="json-box"></pre>
         </article>
         <article class="panel-card">
@@ -60,12 +62,13 @@ export function createLayout(root) {
     </main>
   `;
 
+  // 이후 다른 파일(app.js, controls.js 등)에서 쉽게 쓰도록
+  // 자주 쓰는 DOM 노드들을 한 객체로 묶어 반환한다.
   return {
     patchBtn: root.querySelector('#btn-patch'),
     undoBtn: root.querySelector('#btn-undo'),
     redoBtn: root.querySelector('#btn-redo'),
     awayToggleBtn: root.querySelector('#btn-away-toggle'),
-    hourPlusBtn: root.querySelector('#btn-hour-plus'),
     resetBtn: root.querySelector('#btn-reset'),
     status: root.querySelector('#status'),
     actualRoot: root.querySelector('#actual-root'),
