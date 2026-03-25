@@ -6,4 +6,5 @@ export const PATCH_TYPES = {
   REPLACE: 'REPLACE',
   TEXT: 'TEXT',
   PROPS: 'PROPS',
+  MOVE: 'MOVE',
 };
