@@ -4,9 +4,13 @@ function createRoomCard(state) {
   room.className = 'room-card';
   room.setAttribute('data-room', state.room);
   room.setAttribute('data-key', state.id);
+  room.setAttribute('data-theme', 'light');
 
   room.innerHTML = `
-    <h5 class="room-title" draggable="true" data-drag-handle="true">${state.title}</h5>
+    <div class="room-card-head">
+      <h5 class="room-title" draggable="true" data-drag-handle="true">${state.title}</h5>
+      <button type="button" class="card-theme-btn" data-action="toggle-card-theme">다크모드</button>
+    </div>
     <ul class="device-list">
       <li
         class="device-row"
@@ -244,6 +248,12 @@ function syncBoardPresentation(board) {
   const rooms = board.querySelectorAll('.room-card');
   for (const room of rooms) {
     syncRoomPresentation(room);
+    const isDark = room.classList.contains('is-dark');
+    room.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    const themeBtn = room.querySelector('.card-theme-btn');
+    if (themeBtn) {
+      themeBtn.textContent = isDark ? '라이트모드' : '다크모드';
+    }
   }
 }
 
@@ -356,10 +366,21 @@ export function bindNexusEditor(testRoot, handlers = {}) {
     const board = getBoard(testRoot);
     if (!board) return;
 
+    const action = button.getAttribute('data-action');
+    if (action === 'toggle-card-theme') {
+      const card = button.closest('.room-card');
+      if (!card) return;
+      card.classList.toggle('is-dark');
+      syncBoardPresentation(board);
+      const roomName = card.querySelector('.room-title')?.textContent ?? '카드';
+      const mode = card.classList.contains('is-dark') ? '다크모드' : '라이트모드';
+      onStatus?.(`${roomName} ${mode}로 변경했습니다. Diff에서 변경 사항을 확인하세요.`);
+      onChange?.();
+      return;
+    }
+
     const row = button.closest('.device-row');
     if (!row) return;
-
-    const action = button.getAttribute('data-action');
     const value = button.getAttribute('data-value');
 
     if (action === 'set-light') {
