@@ -30,3 +30,6 @@ Desktop.ini
 # Local temp files
 *.tmp
 *.temp
+
+#발표자료
+comment.md
