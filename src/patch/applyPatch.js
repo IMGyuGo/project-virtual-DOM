@@ -115,9 +115,6 @@ function applySinglePatch(root, patch) {
 
   const parentPath = patch.path.slice(0, -1);
   const targetIndex = patch.path[patch.path.length - 1];
-  // 비루트 패치 해석 규칙:
-  // - parentPath: 부모 노드 경로
-  // - targetIndex: 부모 기준 자식 인덱스
   const parent = getNodeByPath(root, parentPath);
   // 부모를 못 찾으면 (이미 이전 patch에서 구조가 바뀐 경우 등) 안전하게 skip한다.
   if (!parent) return root;
