@@ -399,6 +399,13 @@ button:disabled {
   transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
 }
 
+.room-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 7px;
+}
+
 .room-grid.is-sorting .room-card {
   cursor: grabbing;
 }
@@ -427,7 +434,7 @@ button:disabled {
 }
 
 .room-title {
-  margin: 0 0 7px;
+  margin: 0;
   cursor: grab;
   user-select: none;
   display: inline-flex;
@@ -440,6 +447,60 @@ button:disabled {
   color: #7f93ab;
   font-size: 11px;
   letter-spacing: 0.08em;
+}
+
+.card-theme-btn {
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  border: 1px solid #9fb0c5;
+  background: #fff;
+  color: #28425d;
+}
+
+.room-card.is-dark {
+  background: #162332;
+  border-color: #385674;
+}
+
+.room-card.is-dark .room-title,
+.room-card.is-dark .device-name {
+  color: #e8f2ff;
+}
+
+.room-card.is-dark .room-title::before {
+  color: #9ab7d4;
+}
+
+.room-card.is-dark .device-row {
+  background: #1d2f43;
+  border-color: #385674;
+}
+
+.room-card.is-dark .device-readout,
+.room-card.is-dark .ac-temp-readout {
+  color: #86f0df;
+}
+
+.room-card.is-dark .temp-control,
+.room-card.is-dark em {
+  color: #c5d6e9;
+}
+
+.room-card.is-dark .card-theme-btn,
+.room-card.is-dark .chip-btn {
+  background: #24394f;
+  border-color: #4a6785;
+  color: #e7f1ff;
+}
+
+.room-card.is-dark .chip-btn.is-active,
+.room-card.is-dark .chip-btn[aria-pressed='true'] {
+  background: #12473f;
+  border-color: #2bb59c;
+  color: #cbfff4;
 }
 
 .device-list {
