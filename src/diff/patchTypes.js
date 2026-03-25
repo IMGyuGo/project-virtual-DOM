@@ -1,0 +1,7 @@
+export const PATCH_TYPES = {
+  CREATE: 'CREATE',
+  REMOVE: 'REMOVE',
+  REPLACE: 'REPLACE',
+  TEXT: 'TEXT',
+  PROPS: 'PROPS',
+};
