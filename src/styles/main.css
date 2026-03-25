@@ -154,6 +154,25 @@ button:disabled {
   pointer-events: none;
 }
 
+.readonly-root .state-buttons,
+.readonly-root .temp-control,
+.readonly-root .ac-temp-input {
+  display: none !important;
+}
+
+.readonly-root .device-row,
+.readonly-root .device-row-ac {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.readonly-root .device-readout,
+.readonly-root .ac-temp-readout {
+  color: var(--accent-strong) !important;
+  font-weight: 800;
+}
+
 .editable-root {
   outline: none;
 }
