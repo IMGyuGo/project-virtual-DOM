@@ -1,4 +1,6 @@
 export function createLayout(root) {
+  // 실제 HTML 마크업을 JS로 한 번에 그려 넣는다.
+  // index.html에는 #app만 있고, 화면 구조는 여기서 만들어진다.
   root.innerHTML = `
     <main class="nexus-shell">
       <header class="hero">
@@ -60,6 +62,8 @@ export function createLayout(root) {
     </main>
   `;
 
+  // 이후 다른 파일(app.js, controls.js 등)에서 쉽게 쓰도록
+  // 자주 쓰는 DOM 노드들을 한 객체로 묶어 반환한다.
   return {
     patchBtn: root.querySelector('#btn-patch'),
     undoBtn: root.querySelector('#btn-undo'),

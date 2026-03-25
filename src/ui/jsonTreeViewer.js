@@ -1,21 +1,25 @@
 let lastAfterTree = null;
 let tick = 0;
 
+// 객체/배열을 안전하게 복사해서 렌더용 데이터로 쓴다.
 function cloneValue(value) {
   if (typeof structuredClone === 'function') return structuredClone(value);
   return JSON.parse(JSON.stringify(value));
 }
 
+// 값이 더 이상 내려갈 하위 구조가 없는지(문자/숫자/불리언/null) 판단
 function isPrimitive(value) {
   return value === null || (typeof value !== 'object' && typeof value !== 'function');
 }
 
+// 원시값을 화면에 보기 좋게 문자열로 바꾼다.
 function primitiveText(value) {
   if (typeof value === 'string') return `"${value}"`;
   if (value === null) return 'null';
   return String(value);
 }
 
+// JSON 트리 한 줄(row) UI 생성
 function createRow(key, text, valueClass = '') {
   const row = document.createElement('div');
   row.className = 'json-row';
@@ -34,6 +38,7 @@ function createRow(key, text, valueClass = '') {
   return row;
 }
 
+// 객체/배열을 재귀로 순회해서 트리 구조 <li>를 만든다.
 function walkTree(key, value) {
   const li = document.createElement('li');
 
@@ -60,6 +65,7 @@ function walkTree(key, value) {
   return li;
 }
 
+// 특정 DOM 요소 안에 "예쁘게 정리된 JSON 트리"를 렌더링
 function renderPrettyTree(el, value) {
   if (!el) return;
   const root = document.createElement('div');
@@ -73,10 +79,12 @@ function renderPrettyTree(el, value) {
   el.replaceChildren(root);
 }
 
+// path 배열([1,0,2])을 읽기 쉬운 문자열로 바꾸는 헬퍼
 function pathText(path = []) {
   return `[${path.join(', ')}]`;
 }
 
+// patch 1개를 사람이 읽기 쉬운 로그 문장으로 변환
 function patchText(patch) {
   if (!patch || typeof patch !== 'object') return String(patch);
   const path = pathText(patch.path || []);
@@ -88,12 +96,14 @@ function patchText(patch) {
   return `${patch.type || 'UNKNOWN'} @ ${path}`;
 }
 
+// 입력이 단일 patch여도 항상 배열처럼 다루기 위한 정규화
 function normalizePatches(value) {
   if (Array.isArray(value)) return value;
   if (!value) return [];
   return [value];
 }
 
+// 공백 텍스트/주석 노드는 제외하고 "의미 있는 자식 노드"만 반환
 function meaningfulChildren(node) {
   return Array.from(node.childNodes).filter((child) => {
     if (child.nodeType === Node.COMMENT_NODE) return false;
@@ -102,6 +112,7 @@ function meaningfulChildren(node) {
   });
 }
 
+// path 기준으로 실제 DOM 노드를 찾아간다.
 function nodeAtPath(rootNode, path = []) {
   let current = rootNode;
   for (const index of path) {
@@ -112,6 +123,7 @@ function nodeAtPath(rootNode, path = []) {
   return current;
 }
 
+// 하이라이트 애니메이션을 다시 재생시키기 위한 유틸
 function flashNode(node, className) {
   if (!node) return;
 
@@ -126,6 +138,8 @@ function flashNode(node, className) {
   target.classList.add(className);
 }
 
+// diff 결과(path)를 기준으로
+// 1) 트리 노드, 2) 실제/수정 영역 DOM 노드를 동시에 강조한다.
 function highlightPatchTargets(patches) {
   const roots = [
     document.querySelector('#actual-root')?.firstElementChild,
@@ -144,6 +158,7 @@ function highlightPatchTargets(patches) {
   }
 }
 
+// Real-time Patch Log 패널 렌더링
 function renderPatchLog(patches) {
   const log = document.querySelector('#patch-log');
   if (!log) return;
@@ -169,6 +184,7 @@ function renderPatchLog(patches) {
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
+// 0,1,2... 인덱스를 A,B,C... 라벨로 변환
 function alphaLabel(index) {
   let value = index + 1;
   let text = '';
@@ -180,12 +196,14 @@ function alphaLabel(index) {
   return text;
 }
 
+// 툴팁용 노드 요약 문자열
 function nodeSummary(node) {
   if (!node) return 'null';
   if (node.type === 'text') return 'text';
   return `<${node.tag}>`;
 }
 
+// SVG 엘리먼트 생성 헬퍼
 function createSvgEl(tag, attrs = {}) {
   const el = document.createElementNS(SVG_NS, tag);
   for (const [name, value] of Object.entries(attrs)) {
@@ -194,6 +212,7 @@ function createSvgEl(tag, attrs = {}) {
   return el;
 }
 
+// VDOM 트리를 "그래프 노드 목록" 형태로 평탄화한다.
 function collectGraphRecords(node, path = [], depth = 0, records = []) {
   if (!node) return null;
   const id = records.length;
@@ -210,6 +229,7 @@ function collectGraphRecords(node, path = [], depth = 0, records = []) {
   return id;
 }
 
+// 트리 레이아웃: 각 노드의 가로 위치(x)를 계산
 function assignHorizontalPositions(records, id, layoutState) {
   const record = records[id];
   if (record.children.length === 0) {
@@ -223,6 +243,7 @@ function assignHorizontalPositions(records, id, layoutState) {
   return record.x;
 }
 
+// Tree Visualizer(SVG)를 실제로 그리는 핵심 함수
 function renderTreeGraph(vdomTree) {
   const graph = document.querySelector('#tree-graph');
   if (!graph) return;
@@ -343,10 +364,14 @@ function renderTreeGraph(vdomTree) {
   graph.replaceChildren(wrapper);
 }
 
+// 외부(app.js)에서 트리 미리보기를 갱신할 때 쓰는 공개 함수
 export function renderTreePreview(vdomTree) {
   renderTreeGraph(vdomTree);
 }
 
+// 공용 렌더 진입점:
+// - json-current: before/after + 트리
+// - json-diff: diff 트리 + 로그 + 하이라이트
 export function renderJson(el, value) {
   if (!el) return;
 

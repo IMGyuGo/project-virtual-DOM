@@ -1,3 +1,4 @@
+// 방(거실/침실/주방) 카드 1개를 만드는 함수
 function createRoomCard(state) {
   const room = document.createElement('article');
   room.className = 'room-card';
@@ -51,24 +52,31 @@ function createRoomCard(state) {
   return room;
 }
 
+// test-root 안에서 현재 Nexus 보드 루트(section.nexus-board)를 가져온다.
 function getBoard(testRoot) {
   return testRoot.firstElementChild;
 }
 
+// 방 카드들이 들어있는 .room-grid 컨테이너를 가져온다.
 function getRoomGrid(testRoot) {
   return getBoard(testRoot)?.querySelector('.room-grid') ?? null;
 }
 
+// 현재 방 카드 순서를 문자열 배열로 뽑는다. (드래그 전/후 비교용)
 function roomOrder(grid) {
   return Array.from(grid.querySelectorAll('.room-card[data-room]')).map((card) => card.getAttribute('data-room') ?? '');
 }
 
+// 방 카드 순서를 드래그로 바꿀 수 있게 이벤트를 붙인다.
+// 핵심 아이디어: 드래그 중에는 "빈 슬롯(dropSlot)"을 만들고,
+// 마지막에 그 슬롯 위치에 카드를 꽂아 넣는다.
 function bindRoomDnD(testRoot, handlers = {}) {
   const { onStatus, onChange } = handlers;
   let draggingCard = null;
   let dropSlot = null;
   let startOrder = '';
 
+  // 드래그 관련 임시 상태/클래스를 정리한다.
   const clearDnD = (grid) => {
     if (dropSlot) {
       dropSlot.remove();
@@ -83,6 +91,7 @@ function bindRoomDnD(testRoot, handlers = {}) {
     }
   };
 
+  // drop/dragend 시 공통으로 호출: 카드 위치 확정 + 변경 여부 감지
   const finalizeDrop = () => {
     if (!draggingCard) return;
     const grid = getRoomGrid(testRoot);
@@ -101,6 +110,7 @@ function bindRoomDnD(testRoot, handlers = {}) {
     }
   };
 
+  // 제목 핸들을 잡고 드래그 시작
   testRoot.addEventListener('dragstart', (event) => {
     const handle = event.target.closest('[data-drag-handle="true"]');
     if (!handle) return;
@@ -129,6 +139,7 @@ function bindRoomDnD(testRoot, handlers = {}) {
     }
   });
 
+  // 마우스 위치에 맞춰 빈 슬롯(dropSlot)을 이동시킨다.
   testRoot.addEventListener('dragover', (event) => {
     if (!draggingCard) return;
     const grid = getRoomGrid(testRoot);
@@ -154,17 +165,20 @@ function bindRoomDnD(testRoot, handlers = {}) {
     }
   });
 
+  // 놓는 순간 위치 확정
   testRoot.addEventListener('drop', (event) => {
     if (!draggingCard) return;
     event.preventDefault();
     finalizeDrop();
   });
 
+  // 드래그가 취소/종료되어도 정리 로직은 동일하게 수행
   testRoot.addEventListener('dragend', () => {
     finalizeDrop();
   });
 }
 
+// 버튼 그룹(ON/OFF, RUNNING/STOPPED...)의 활성 상태 표시를 동기화
 function setButtonState(container, action, activeValue) {
   const buttons = container.querySelectorAll(`button[data-action="${action}"]`);
   for (const button of buttons) {
@@ -174,6 +188,7 @@ function setButtonState(container, action, activeValue) {
   }
 }
 
+// 방 카드 DOM의 "보이는 글자/버튼 상태"를 현재 data-* 값에 맞게 정리
 function syncRoomPresentation(room) {
   const lightRow = room.querySelector('[data-device="light"]');
   const acRow = room.querySelector('[data-device="ac"]');
@@ -208,6 +223,7 @@ function syncRoomPresentation(room) {
   }
 }
 
+// 보드 안의 모든 방 카드에 syncRoomPresentation 적용
 function syncBoardPresentation(board) {
   const rooms = board.querySelectorAll('.room-card');
   for (const room of rooms) {
@@ -215,6 +231,7 @@ function syncBoardPresentation(board) {
   }
 }
 
+// 외출모드 ON/OFF 시 여러 장치 상태를 한 번에 바꾼다.
 function applyAway(board, enabled) {
   board.setAttribute('data-mode', enabled ? 'away' : 'home');
 
@@ -234,6 +251,7 @@ function applyAway(board, enabled) {
   syncBoardPresentation(board);
 }
 
+// Nexus 보드(헤더 + 방 카드들)를 만드는 진입 함수
 export function createNexusBoard() {
   const board = document.createElement('section');
   board.className = 'nexus-board';
@@ -276,11 +294,14 @@ export function createNexusBoard() {
   return board;
 }
 
+// 수정 뷰(test-root) 내부 버튼/입력 이벤트 연결
 export function bindNexusEditor(testRoot, handlers = {}) {
   const { onStatus, onChange } = handlers;
 
+  // 카드 순서 드래그 기능 연결
   bindRoomDnD(testRoot, handlers);
 
+  // 버튼이 아닌 곳에서 Enter로 레이아웃이 깨지는 것을 막는다.
   testRoot.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' && event.target.tagName !== 'BUTTON') {
       event.preventDefault();
@@ -301,6 +322,7 @@ export function bindNexusEditor(testRoot, handlers = {}) {
     const value = button.getAttribute('data-value');
 
     if (action === 'set-light') {
+      // 조명 ON/OFF
       row.setAttribute('data-active', value === 'on' ? 'on' : 'off');
       syncRoomPresentation(row.closest('.room-card'));
       onStatus?.('조명 상태를 수정했습니다. Patch를 누르면 실제 영역에 반영됩니다.');
@@ -308,6 +330,7 @@ export function bindNexusEditor(testRoot, handlers = {}) {
     }
 
     if (action === 'set-ac-power') {
+      // 에어컨 동작 상태 RUNNING/STOPPED
       row.setAttribute('data-power', value === 'on' ? 'on' : 'off');
       syncRoomPresentation(row.closest('.room-card'));
       onStatus?.('에어컨 동작 상태를 수정했습니다. Patch를 눌러 반영하세요.');
@@ -315,6 +338,7 @@ export function bindNexusEditor(testRoot, handlers = {}) {
     }
 
     if (action === 'set-camera') {
+      // 카메라 녹화/대기 상태
       row.setAttribute('data-state', value === 'recording' ? 'recording' : 'idle');
       syncRoomPresentation(row.closest('.room-card'));
       onStatus?.('카메라 상태를 수정했습니다. Patch를 눌러 반영하세요.');
@@ -338,6 +362,7 @@ export function bindNexusEditor(testRoot, handlers = {}) {
 
     const readout = row.querySelector('.ac-temp-readout');
     if (readout) {
+      // 전원이 꺼져 있으면 숫자 대신 OFF로 보여준다.
       const isPowerOn = row.getAttribute('data-power') === 'on';
       readout.textContent = isPowerOn ? `${safe}C` : 'OFF';
       readout.classList.remove('temp-hit');
@@ -350,6 +375,7 @@ export function bindNexusEditor(testRoot, handlers = {}) {
   });
 }
 
+// 외출모드 버튼에서 호출하는 공개 함수
 export function toggleAwayMode(testRoot) {
   const board = getBoard(testRoot);
   if (!board) return false;
