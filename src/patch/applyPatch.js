@@ -62,6 +62,69 @@ function replaceNode(target, vnode) {
   return newNode;
 }
 
+function getPatchPhase(type) {
+  // 구조를 바꾸는 patch를 먼저 적용하고, 내용 갱신 patch를 나중에 적용한다.
+  // 순서:
+  // REMOVE -> CREATE -> MOVE -> REPLACE -> TEXT -> UPDATE_PROPS
+  switch (type) {
+    case PATCH_TYPES.REMOVE:
+      return 0;
+    case PATCH_TYPES.CREATE:
+      return 1;
+    case PATCH_TYPES.MOVE:
+      return 2;
+    case PATCH_TYPES.REPLACE:
+      return 3;
+    case PATCH_TYPES.TEXT:
+      return 4;
+    case PATCH_TYPE_UPDATE_PROPS:
+      return 5;
+    default:
+      return 6;
+  }
+}
+
+function getMoveToIndex(patch) {
+  const parsed = Number.parseInt(patch.to, 10);
+  if (!Number.isFinite(parsed)) return null;
+  return parsed;
+}
+
+function getDomNodeKey(node) {
+  if (!node || node.nodeType !== Node.ELEMENT_NODE) return null;
+  return node.getAttribute('key') ?? node.getAttribute('data-key');
+}
+
+function resolveMoveFromIndex(children, fallbackFromIndex, patchKey) {
+  if (patchKey == null) return fallbackFromIndex;
+  const key = String(patchKey);
+  const foundIndex = children.findIndex((child) => getDomNodeKey(child) === key);
+  if (foundIndex !== -1) return foundIndex;
+  return fallbackFromIndex;
+}
+
+function applyMovePatch(parent, fallbackFromIndex, patch) {
+  const toIndex = getMoveToIndex(patch);
+  if (toIndex == null) return;
+
+  const children = getChildNodesForPath(parent);
+  const fromIndex = resolveMoveFromIndex(children, fallbackFromIndex, patch.key);
+
+  if (fromIndex < 0 || fromIndex >= children.length) return;
+
+  const movingNode = children[fromIndex];
+  if (!movingNode) return;
+
+  // insertBefore는 기존 노드를 전달하면 자동으로 "이동" 처리한다.
+  // 목표 인덱스를 정확히 맞추기 위해 먼저 분리한 뒤 재삽입한다.
+  parent.removeChild(movingNode);
+
+  const childrenAfterRemove = getChildNodesForPath(parent);
+  const boundedTo = Math.max(0, Math.min(toIndex, childrenAfterRemove.length));
+  const anchor = childrenAfterRemove[boundedTo] ?? null;
+  parent.insertBefore(movingNode, anchor);
+}
+
 function getParentPath(path = []) {
   // 마지막 인덱스를 제외한 경로는 부모 노드 경로다.
   return path.slice(0, -1);
@@ -97,17 +160,41 @@ function comparePathDesc(pathA = [], pathB = []) {
 }
 
 function comparePatchOrder(patchA, patchB) {
+  const typeA = normalizePatchType(patchA.type);
+  const typeB = normalizePatchType(patchB.type);
+
   // 1) 더 깊은 노드 patch를 먼저 적용
   const depthDiff = patchB.path.length - patchA.path.length;
   if (depthDiff !== 0) return depthDiff;
 
-  // 같은 부모 아래의 형제 패치는 인덱스 큰 것부터 적용한다.
-  // REMOVE/REPLACE가 섞일 때 앞 인덱스를 먼저 건드리면 뒤 인덱스가 밀릴 수 있다.
+  // 같은 부모 아래에서는 patch 단계(구조 -> 내용) 우선순위를 먼저 맞춘다.
   if (isSameParentPath(patchA.path, patchB.path)) {
+    const phaseDiff = getPatchPhase(typeA) - getPatchPhase(typeB);
+    if (phaseDiff !== 0) return phaseDiff;
+
+    // 같은 단계 내부에서는 타입별로 인덱스 정렬 기준을 다르게 둔다.
+    // REMOVE: 큰 인덱스부터(인덱스 밀림 방지)
+    if (typeA === PATCH_TYPES.REMOVE) {
+      return getTargetIndex(patchB.path) - getTargetIndex(patchA.path);
+    }
+
+    // CREATE: 작은 인덱스부터(목표 위치 기준으로 앞에서부터 채움)
+    if (typeA === PATCH_TYPES.CREATE) {
+      return getTargetIndex(patchA.path) - getTargetIndex(patchB.path);
+    }
+
+    // MOVE: 목표 인덱스(to) 작은 것부터
+    if (typeA === PATCH_TYPES.MOVE) {
+      const moveToA = getMoveToIndex(patchA) ?? Number.MAX_SAFE_INTEGER;
+      const moveToB = getMoveToIndex(patchB) ?? Number.MAX_SAFE_INTEGER;
+      if (moveToA !== moveToB) return moveToA - moveToB;
+    }
+
+    // 그 외(TEXT/REPLACE/UPDATE_PROPS)는 기존처럼 큰 인덱스부터 적용.
     return getTargetIndex(patchB.path) - getTargetIndex(patchA.path);
   }
 
-  // 나머지는 경로 역순으로 고정해 실행 순서를 결정적으로 유지한다.
+  // 부모가 다르면 경로 역순으로 고정해 실행 순서를 유지한다.
   return comparePathDesc(patchA.path, patchB.path);
 }
 
@@ -163,6 +250,11 @@ function applySinglePatch(root, patch) {
       // REPLACE는 현재 시점 target을 새 vnode로 교체한다.
       if (target) replaceNode(target, patch.node);
       break;
+    case PATCH_TYPES.MOVE:
+      // MOVE는 기존 위치(path)에서 목표 위치(to)로 같은 노드를 재배치한다.
+      // key가 있으면 key로 현재 위치를 다시 찾아 인덱스 변경 영향을 줄인다.
+      applyMovePatch(parent, targetIndex, patch);
+      break;
     case PATCH_TYPES.TEXT:
       // TEXT는 텍스트 노드에만 적용한다.
       if (target && target.nodeType === Node.TEXT_NODE) {
@@ -191,8 +283,9 @@ function applySinglePatch(root, patch) {
 export function applyPatches(rootNode, patches = []) {
   // 2단계 적용 순서 안정화:
   // 1) 깊은 경로를 먼저 적용
-  // 2) 같은 부모의 형제 노드는 큰 인덱스부터 적용
-  // 3) 나머지는 경로 역순으로 결정적 정렬
+  // 2) 같은 부모에서는 patch 단계 우선순위(REMOVE -> CREATE -> MOVE -> 내용 갱신)를 적용
+  // 3) 같은 단계 내부는 타입별 정렬 기준(인덱스/목표 인덱스)을 적용
+  // 4) 나머지는 경로 역순으로 결정적 정렬
   const ordered = [...patches].sort(comparePatchOrder);
   let currentRoot = rootNode;
 
