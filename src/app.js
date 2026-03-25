@@ -58,6 +58,12 @@ function bootstrap() {
     }
 
     const { nextTree, patches } = draft;
+    if (patches.length === 0) {
+      renderJson(ui.patchViewer, []);
+      syncControlState(ui, history);
+      setStatus(ui, '변경 사항이 없어 Patch를 생략했습니다.');
+      return;
+    }
     const currentActualNode = ui.actualRoot.firstElementChild;
 
     if (currentActualNode) {
