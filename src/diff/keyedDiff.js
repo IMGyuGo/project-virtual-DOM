@@ -31,6 +31,30 @@ function createKeyedPair({
   };
 }
 
+// 중복 key를 감지했을 때 개발 중 바로 알아차릴 수 있도록 경고를 남긴다.
+// key 기반 비교는 "같은 부모 안에서 key가 고유하다"는 전제가 중요하므로, 중복을 조용히 넘기지 않고 드러내는 편이 안전하다.
+function warnDuplicateKey(key, index, sourceLabel) {
+  console.warn(`[diff/keyedDiff] 중복 key 감지: "${key}" (${sourceLabel}, index: ${index})`);
+}
+
+// 자식 배열 안에서 key가 중복되는지 미리 확인한다.
+// old/new 어느 쪽에서든 고유 key 규칙이 깨지면 MOVE/CREATE/REMOVE 판단이 흔들릴 수 있으므로, pair 생성 전에 경고를 남긴다.
+function validateUniqueKeys(children = [], sourceLabel) {
+  const seenKeys = new Set();
+
+  children.forEach((child, index) => {
+    const key = getNodeKey(child);
+    if (key == null) return;
+
+    if (seenKeys.has(key)) {
+      warnDuplicateKey(key, index, sourceLabel);
+      return;
+    }
+
+    seenKeys.add(key);
+  });
+}
+
 // 자식 배열을 key로 빠르게 찾을 수 있도록 Map으로 만든다.
 // 새 자식을 순회하면서 같은 key를 즉시 찾기 위해 기존 위치 정보도 함께 저장한다.
 export function buildKeyMap(children = []) {
@@ -38,7 +62,12 @@ export function buildKeyMap(children = []) {
 
   children.forEach((child, index) => {
     const key = getNodeKey(child);
-    if (key == null || keyMap.has(key)) return;
+    if (key == null) return;
+
+    if (keyMap.has(key)) {
+      // 중복 key는 validateUniqueKeys에서 이미 경고했으므로, 첫 매칭 기준을 유지하며 뒤쪽 중복은 건너뛴다.
+      return;
+    }
 
     keyMap.set(key, { child, index });
   });
@@ -50,6 +79,9 @@ export function buildKeyMap(children = []) {
 // 이렇게 해야 앞에 항목이 추가되거나 위치가 바뀌어도 기존 노드 전체를 바뀐 것으로 보지 않고,
 // CREATE / REMOVE / MOVE 후보를 더 정확하게 구분할 수 있다.
 export function collectKeyedPairs(oldChildren = [], newChildren = []) {
+  validateUniqueKeys(oldChildren, 'oldChildren');
+  validateUniqueKeys(newChildren, 'newChildren');
+
   const oldKeyMap = buildKeyMap(oldChildren);
   const matchedKeys = new Set();
   const pairs = [];

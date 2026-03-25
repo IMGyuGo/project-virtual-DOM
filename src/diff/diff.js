@@ -28,19 +28,88 @@ function shouldCreateMovePatch(pair) {
   );
 }
 
-// 자식 pair 목록에서 위치 이동이 발생한 노드를 찾아 MOVE patch를 추가한다.
-// CREATE/REMOVE와 달리 같은 노드의 "위치만 변경"된 경우를 별도로 기록해야 keyed diff 의도를 더 분명하게 표현할 수 있다.
-function appendMovePatches(pairs, path, patches) {
-  for (const pair of pairs) {
-    if (!shouldCreateMovePatch(pair)) continue;
-
-    patches.push({
-      type: PATCH_TYPE_MOVE,
-      path: [...path, pair.oldIndex],
-      to: pair.newIndex,
-      key: pair.key,
-    });
+// patch 팀 계약에 맞춰 diff 단계에서도 같은 phase 순서를 공유한다.
+// 같은 부모에서 CREATE/REMOVE/MOVE가 섞여도 예측 가능한 순서로 patch를 만들기 위해 사용한다.
+function getPatchPhase(type) {
+  switch (type) {
+    case PATCH_TYPES.REMOVE:
+      return 0;
+    case PATCH_TYPES.CREATE:
+      return 1;
+    case PATCH_TYPE_MOVE:
+      return 2;
+    case PATCH_TYPES.REPLACE:
+      return 3;
+    case PATCH_TYPES.TEXT:
+      return 4;
+    case PATCH_TYPES.PROPS:
+      return 5;
+    default:
+      return 6;
   }
+}
+
+// 현재 patch가 지금 부모의 "직계 자식" patch인지 확인한다.
+// 같은 부모에서 섞이는 구조 변경 patch만 먼저 정렬해야 patch 계약을 깨지 않고 출력할 수 있다.
+function isDirectChildPatch(parentPath, patchPath) {
+  if (patchPath.length !== parentPath.length + 1) return false;
+  return parentPath.every((value, index) => value === patchPath[index]);
+}
+
+// 같은 부모 아래 direct child patch의 순서를 정한다.
+// REMOVE -> CREATE -> MOVE -> REPLACE -> TEXT -> PROPS 순서를 맞추고, 같은 phase 안에서는 index 안정성을 유지한다.
+function compareSiblingPatchOrder(patchA, patchB) {
+  const phaseDiff = getPatchPhase(patchA.type) - getPatchPhase(patchB.type);
+  if (phaseDiff !== 0) return phaseDiff;
+
+  const indexA = patchA.path[patchA.path.length - 1] ?? -1;
+  const indexB = patchB.path[patchB.path.length - 1] ?? -1;
+
+  if (patchA.type === PATCH_TYPES.REMOVE) {
+    return indexB - indexA;
+  }
+
+  if (patchA.type === PATCH_TYPES.CREATE) {
+    return indexA - indexB;
+  }
+
+  if (patchA.type === PATCH_TYPE_MOVE) {
+    const toA = Number.isFinite(patchA.to) ? patchA.to : Number.MAX_SAFE_INTEGER;
+    const toB = Number.isFinite(patchB.to) ? patchB.to : Number.MAX_SAFE_INTEGER;
+    if (toA !== toB) return toA - toB;
+  }
+
+  return indexB - indexA;
+}
+
+// pair 정보로 MOVE patch를 만든다.
+// MOVE.path는 기존 위치(oldIndex), MOVE.to는 새 위치(newIndex)라는 계약을 diff 단계에서 명확하게 고정한다.
+function createMovePatch(path, pair) {
+  return {
+    type: PATCH_TYPE_MOVE,
+    path: [...path, pair.oldIndex],
+    to: Number(pair.newIndex),
+    key: pair.key,
+  };
+}
+
+// 자식 비교에서 나온 patch를 현재 부모 기준으로 정리해 patches에 추가한다.
+// direct child patch는 phase 순서로 정렬하고, 더 깊은 하위 patch는 재귀 결과를 그대로 뒤에 붙인다.
+function appendOrderedChildPatches(path, childPatches, patches) {
+  const directChildPatches = [];
+  const nestedPatches = [];
+
+  for (const patch of childPatches) {
+    if (isDirectChildPatch(path, patch.path)) {
+      directChildPatches.push(patch);
+      continue;
+    }
+
+    nestedPatches.push(patch);
+  }
+
+  directChildPatches.sort(compareSiblingPatchOrder);
+  patches.push(...directChildPatches, ...nestedPatches);
 }
 
 // 이전 트리와 다음 트리를 재귀적으로 비교해 patch 목록을 누적한다.
@@ -74,17 +143,19 @@ function walk(oldNode, newNode, path, patches) {
   }
 
   const pairs = collectChildPairs(oldNode.children, newNode.children);
+  const childPatches = [];
 
-  // 같은 key를 가진 노드의 위치가 바뀐 경우를 먼저 MOVE patch로 기록한다.
-  // 이후 재귀 비교는 노드 내부 내용(TEXT/PROPS 등) 변경을 계속 추적하도록 그대로 유지한다.
-  appendMovePatches(pairs, path, patches);
-
-  // 자식 비교 결과에서 path 계산에 사용할 index를 분리해서 읽는다.
-  // 이렇게 해두면 index 기반 비교와 key 기반 비교가 모두 같은 walk 로직을 재사용할 수 있다.
   for (const pair of pairs) {
-    const pathIndex = pair.pathIndex ?? pair.index;
-    walk(pair.oldChild, pair.newChild, [...path, pathIndex], patches);
+    if (shouldCreateMovePatch(pair)) {
+      childPatches.push(createMovePatch(path, pair));
+    }
+
+    // 현재 pair 계약에서는 pathIndex를 항상 제공하므로, 재귀 path 계산도 그 값을 그대로 사용한다.
+    // 예전 index fallback을 제거해 diffChildren/keyedDiff와의 계약을 더 명확하게 맞춘다.
+    walk(pair.oldChild, pair.newChild, [...path, pair.pathIndex], childPatches);
   }
+
+  appendOrderedChildPatches(path, childPatches, patches);
 }
 
 // 외부에서는 이전 트리와 다음 트리만 넘기면 되도록 diff 진입점을 단순하게 유지한다.
