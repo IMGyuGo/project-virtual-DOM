@@ -93,6 +93,7 @@ function patchText(patch) {
   if (patch.type === 'REPLACE') return `REPLACE @ ${path}`;
   if (patch.type === 'CREATE') return `CREATE @ ${path}`;
   if (patch.type === 'REMOVE') return `REMOVE @ ${path}`;
+  if (patch.type === 'MOVE') return `MOVE @ ${path} => to:${patch.to} key:${patch.key ?? '-'}`;
   return `${patch.type || 'UNKNOWN'} @ ${path}`;
 }
 
@@ -391,7 +392,14 @@ export function renderJson(el, value) {
     const pretty = patches.map((patch) => ({
       type: patch.type,
       path: patch.path,
-      detail: patch.type === 'TEXT' ? patch.text : patch.type === 'PROPS' ? patch.props : patch.node ?? null,
+      detail:
+        patch.type === 'TEXT'
+          ? patch.text
+          : patch.type === 'PROPS'
+            ? patch.props
+            : patch.type === 'MOVE'
+              ? { to: patch.to, key: patch.key ?? null }
+              : patch.node ?? null,
     }));
 
     renderPrettyTree(el, pretty);

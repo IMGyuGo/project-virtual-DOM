@@ -31,6 +31,30 @@ function applyPropsPatch(target, propsPatch) {
   }
 }
 
+function getElementKey(node) {
+  if (!node || node.nodeType !== Node.ELEMENT_NODE) return null;
+  return node.getAttribute('data-key') ?? node.getAttribute('key');
+}
+
+function findMoveTarget(parent, patch, fallbackIndex) {
+  if (patch.key != null) {
+    const wantedKey = String(patch.key);
+    const byKey = getChildNodesForPath(parent).find((child) => String(getElementKey(child)) === wantedKey);
+    if (byKey) return byKey;
+  }
+
+  return getChildNodesForPath(parent)[fallbackIndex] ?? null;
+}
+
+function moveChild(parent, target, toIndex) {
+  if (!parent || !target) return;
+
+  const children = getChildNodesForPath(parent).filter((child) => child !== target);
+  const safeIndex = Math.max(0, Math.min(toIndex, children.length));
+  const anchor = children[safeIndex] ?? null;
+  parent.insertBefore(target, anchor);
+}
+
 function replaceNode(target, vnode) {
   // REPLACE는 대상 노드를 통째로 새 vnode 렌더 결과로 교체한다.
   const newNode = renderVdom(vnode);
@@ -149,6 +173,14 @@ function applySinglePatch(root, patch) {
       // UPDATE_PROPS는 target element 속성만 부분 변경한다.
       applyPropsPatch(target, patch.props);
       break;
+    case PATCH_TYPES.MOVE: {
+      // MOVE는 key(있다면 key 우선)로 기존 DOM 노드를 찾아 새 인덱스로 이동한다.
+      const moveTarget = findMoveTarget(parent, patch, targetIndex);
+      if (moveTarget && Number.isInteger(patch.to)) {
+        moveChild(parent, moveTarget, patch.to);
+      }
+      break;
+    }
     default:
       break;
   }

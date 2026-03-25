@@ -132,8 +132,9 @@
 
 - key가 없는 경우는 index 기반 비교를 유지합니다.
 - key가 있는 경우는 같은 key를 우선 매칭하는 keyed diff 구조를 사용합니다.
-- `diff` 단계에서는 `MOVE` patch를 생성할 수 있습니다.
-- 다만 `MOVE`가 실제 DOM에 완전히 반영되려면 patch 단계와의 연결도 함께 맞아야 합니다.
+- `diff` 단계에서 생성한 `MOVE` patch는 patch 단계에서 key 기반으로 실제 DOM 재배치까지 반영됩니다.
+- 이 프로젝트에서는 `props.key` 또는 `data-key`를 key로 인식합니다.
+- 예: room-card는 `data-room="living"`과 함께 `data-key="living"`를 사용하면 재생성 없이 이동됩니다.
 - 중복 key가 들어오는 경우는 현재 별도 예외 처리보다 첫 매칭 기준으로 동작합니다.
 
 ## 요약

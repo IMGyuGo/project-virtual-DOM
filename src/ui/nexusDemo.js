@@ -3,6 +3,7 @@ function createRoomCard(state) {
   const room = document.createElement('article');
   room.className = 'room-card';
   room.setAttribute('data-room', state.room);
+  room.setAttribute('data-key', state.room);
 
   room.innerHTML = `
     <h5 class="room-title" draggable="true" data-drag-handle="true">${state.title}</h5>
