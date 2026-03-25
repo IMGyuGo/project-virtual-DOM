@@ -28,7 +28,11 @@ function reconcileIfNeeded(ui) {
 function seedNexusDemo(ui, handlers) {
   ui.testRoot.replaceChildren(createNexusBoard());
   handlers.onPatch();
-  reconcileIfNeeded(ui);
+  if (handlers.withMutationMute) {
+    handlers.withMutationMute('seed-reconcile', () => reconcileIfNeeded(ui));
+  } else {
+    reconcileIfNeeded(ui);
+  }
   handlers.onDraftChange?.();
   setHint(ui.status, 'Nexus Home 초기화 완료: 장치 상태를 수정한 뒤 Patch를 눌러 비교하세요.');
 }
@@ -40,7 +44,9 @@ export function bindControls(ui, handlers) {
   // Patch: 수정 뷰의 변경을 실제 뷰에 반영
   patchBtn.addEventListener('click', () => {
     handlers.onPatch();
-    const reconciled = reconcileIfNeeded(ui);
+    const reconciled = handlers.withMutationMute
+      ? handlers.withMutationMute('reconcile-after-patch', () => reconcileIfNeeded(ui))
+      : reconcileIfNeeded(ui);
     if (reconciled) {
       setHint(status, 'Patch 후 뷰 차이를 자동 동기화했습니다.');
     }

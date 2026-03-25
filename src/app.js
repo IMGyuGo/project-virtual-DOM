@@ -8,6 +8,7 @@ import { createSampleBoardNode } from './samples/fridgeSample.js';
 import { createLayout } from './ui/layout.js';
 import { bindControls, syncControlState } from './ui/controls.js';
 import { renderJson, renderTreePreview } from './ui/jsonTreeViewer.js';
+import { createMutationObserverPanel } from './ui/mutationObserverPanel.js';
 import { patchSummary } from './utils/logger.js';
 
 // 상태 문구(우측 상단 안내 텍스트)를 바꿀 때 쓰는 공통 함수
@@ -25,10 +26,18 @@ function bootstrap() {
   // index.html의 #app 비어있는 div에 실제 화면 뼈대를 주입한다.
   const root = document.querySelector('#app');
   const ui = createLayout(root);
+  const mutationPanel = createMutationObserverPanel({
+    targetNode: ui.actualRoot,
+    metricsEl: ui.mutationMetrics,
+    logEl: ui.mutationLog,
+    debounceMs: 160,
+  });
 
   // 첫 화면 샘플 DOM을 만든 뒤, 이를 Virtual DOM 기준 상태로 삼는다.
   const sampleDom = createSampleBoardNode();
-  ui.actualRoot.replaceChildren(sampleDom);
+  mutationPanel.withObserverMute('bootstrap-init', () => {
+    ui.actualRoot.replaceChildren(sampleDom);
+  });
 
   const initialTree = domToVdom(ui.actualRoot.firstElementChild);
   mountVdom(ui.testRoot, initialTree);
@@ -75,14 +84,16 @@ function bootstrap() {
     }
     const currentActualNode = ui.actualRoot.firstElementChild;
 
-    if (currentActualNode) {
-      const updatedNode = applyPatches(currentActualNode, patches);
-      if (updatedNode !== currentActualNode) {
-        ui.actualRoot.replaceChildren(updatedNode);
+    mutationPanel.withObserverMute('patch-commit', () => {
+      if (currentActualNode) {
+        const updatedNode = applyPatches(currentActualNode, patches);
+        if (updatedNode !== currentActualNode) {
+          ui.actualRoot.replaceChildren(updatedNode);
+        }
+      } else {
+        mountVdom(ui.actualRoot, nextTree);
       }
-    } else {
-      mountVdom(ui.actualRoot, nextTree);
-    }
+    });
 
     history.push(nextTree);
     store.setTree(nextTree);
@@ -101,7 +112,9 @@ function bootstrap() {
     }
 
     store.setTree(tree);
-    renderBothFromTree(ui, tree);
+    mutationPanel.withObserverMute('history-sync', () => {
+      renderBothFromTree(ui, tree);
+    });
     renderJson(ui.currentTreeViewer, tree);
     renderDraftDiff();
     syncControlState(ui, history);
@@ -121,7 +134,14 @@ function bootstrap() {
   };
 
   // 버튼/입력 이벤트를 연결하고 최초 상태 문구를 표시
-  bindControls(ui, { onPatch, onUndo, onRedo, onDraftChange: renderDraftDiff });
+  bindControls(ui, {
+    onPatch,
+    onUndo,
+    onRedo,
+    onDraftChange: renderDraftDiff,
+    withMutationMute: mutationPanel.withObserverMute,
+  });
+  mutationPanel.observe();
   setStatus(ui, '초기화 완료');
 }
 

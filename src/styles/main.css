@@ -298,12 +298,47 @@ button:disabled {
   overflow: auto;
 }
 
+.subheading {
+  margin: 14px 0 6px;
+  font-size: 14px;
+  color: var(--text);
+}
+
 .tree-graph {
   border: 1px solid var(--line);
   background: linear-gradient(180deg, #f6f8fa, #eef2f6);
   border-radius: 12px;
   padding: 12px;
   overflow: auto;
+}
+
+.mutation-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 8px;
+}
+
+.metric-chip {
+  display: inline-block;
+  border: 1px solid #2b3d55;
+  background: #0f1725;
+  color: #c7d4ef;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  line-height: 1.3;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+}
+
+.mutation-log {
+  min-height: 140px;
+  max-height: 220px;
+  overflow: auto;
+  border-radius: 12px;
+  border: 1px solid #243045;
+  background: #101827;
+  padding: 10px;
 }
 
 .graph-readable {

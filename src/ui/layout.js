@@ -58,6 +58,10 @@ export function createLayout(root) {
         <h3>Tree Visualizer</h3>
         <p>트리 구조를 점과 선으로 표현합니다. 변경 path 노드는 반짝 표시됩니다.</p>
         <div id="tree-graph" class="tree-graph"></div>
+        <h4 class="subheading">Mutation Observer (actualRoot)</h4>
+        <p class="tree-caption">rAF 배치 + debounce 렌더링으로 실제 DOM 변경 로그를 시각화합니다.</p>
+        <div id="mutation-metrics" class="mutation-metrics"></div>
+        <div id="mutation-log" class="mutation-log"></div>
       </section>
     </main>
   `;
@@ -78,5 +82,7 @@ export function createLayout(root) {
     patchLog: root.querySelector('#patch-log'),
     afterTreeViewer: root.querySelector('#json-after'),
     treeGraph: root.querySelector('#tree-graph'),
+    mutationMetrics: root.querySelector('#mutation-metrics'),
+    mutationLog: root.querySelector('#mutation-log'),
   };
 }
